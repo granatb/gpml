@@ -18,6 +18,7 @@ class RetailRocketImporter(GraphDBBase):
             reader = csv.reader(in_file, delimiter=',')
             next(reader, None)
             with self._driver.session() as session:
+                self.execute_without_exception("CREATE OR REPLACE DATABASE neo4j")
                 self.execute_without_exception("CREATE CONSTRAINT ON (u:User) ASSERT u.userId IS UNIQUE")
                 self.execute_without_exception("CREATE CONSTRAINT ON (u:Item) ASSERT u.itemId IS UNIQUE")
 
@@ -27,25 +28,34 @@ class RetailRocketImporter(GraphDBBase):
                 query = """
                     MERGE (item:Item {itemId: $itemId})
                     MERGE (user:User {userId: $userId})
-                    MERGE (user)-[:PURCHASES { timestamp: $timestamp}]->(item)
+                    MERGE (user)-[:BOOKMARKS {}]->(item)
                 """
                 for row in reader:
                     try:
                         if row:
-                            timestamp = strip(row[0])
-                            user_id = strip(row[1])
-                            event_type = strip(row[2])
-                            item_id = strip(row[3])
+                            # timestamp = strip(row[0])
+                            user_id = strip(row[0])
+                            # event_type = strip(row[2])
+                            item_id = strip(row[1])
 
-                            if event_type == "transaction":
-                                tx.run(query, {"itemId": item_id, "userId": user_id, "timestamp": timestamp})
-                                i += 1
-                                j += 1
-                                if i == 1000:
-                                    tx.commit()
-                                    print(j, "lines processed")
-                                    i = 0
-                                    tx = session.begin_transaction()
+                            # if event_type == "transaction":
+                            #     tx.run(query, {"itemId": item_id, "userId": user_id, "timestamp": timestamp})
+                            #     i += 1
+                            #     j += 1
+                            #     if i == 1000:
+                            #         tx.commit()
+                            #         print(j, "lines processed")
+                            #         i = 0
+                            #         tx = session.begin_transaction()
+    
+                            tx.run(query, {"itemId": item_id, "userId": user_id})
+                            i += 1
+                            j += 1
+                            if i == 1000:
+                                tx.commit()
+                                print(j, "lines processed")
+                                i = 0
+                                tx = session.begin_transaction()
                     except Exception as e:
                         print(e, row, reader.line_num)
                 tx.commit()
@@ -57,8 +67,8 @@ if __name__ == '__main__':
     importing = RetailRocketImporter(argv=sys.argv[1:])
     base_path = importing.source_dataset_path
     if not base_path:
-        base_path = "../../../dataset/retailrocket/"
-    file_path = os.path.join(base_path, "events.csv")
+        base_path = "" #"../../../dataset/retailrocket/"
+    file_path = os.path.join(base_path, "bookmarks_clean.csv")
     importing.import_user_item(file=file_path)
     end = time.time() - start
     print("Time to complete:", end)
